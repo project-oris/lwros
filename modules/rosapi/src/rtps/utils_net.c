@@ -53,3 +53,20 @@ z_result_t _rtps_wbuf_add_wbuf(_z_wbuf_t *_dst, _z_wbuf_t *src)
 
     return ret;
 }
+
+
+_z_wbuf_t _z_wbuf_compact(_z_wbuf_t *wbf, size_t sz)
+{
+    size_t len = _z_wbuf_len(wbf);
+
+    if (sz > len) len = sz;
+
+    _z_wbuf_t obf = _z_wbuf_make(len, true);
+
+    for (size_t i = wbf->_r_idx; i<= wbf->_w_idx;i++) {
+        _z_iosli_t *ios = _z_wbuf_get_iosli(wbf, i);
+        _z_wbuf_write_bytes(&obf, ios->_buf, ios->_r_pos, _z_iosli_readable(ios));
+    }
+
+    return obf;
+}

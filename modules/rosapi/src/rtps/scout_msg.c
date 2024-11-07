@@ -428,15 +428,11 @@ z_result_t _rtps_scout_parameterlist_cdr_encode(_z_wbuf_t *_owbf, _rtps_scout_pa
 z_result_t _rtps_scouting_message_encode(_z_wbuf_t *buf, _rtps_scouting_message_t *msg){
     z_result_t ret = _Z_RES_OK;
 
-    _z_wbuf_t zzwbf;
-    //_z_wbuf_t *owbf = &zzwbf;
-    _z_wbuf_t *owbf = buf;
+    _z_wbuf_t _i_wbf;
 
-    *owbf = _z_wbuf_make(sizeof(_rtps_header_t), true);    
-    
+    _i_wbf = _z_wbuf_make(sizeof(_rtps_header_t), true);
     // write RTPS Header    
-    ret = _z_wbuf_write_bytes(owbf,(uint8_t *)&msg->_header, 0, sizeof(_rtps_header_t));
-
+    ret = _z_wbuf_write_bytes(&_i_wbf,(uint8_t *)&msg->_header, 0, sizeof(_rtps_header_t));
     // write INFO_TS submessage
     if (ret == _Z_RES_OK) {
         _rtps_submsg_header_t _sub_header; 
@@ -444,51 +440,14 @@ z_result_t _rtps_scouting_message_encode(_z_wbuf_t *buf, _rtps_scouting_message_
         _sub_header._flags = RTPS_LITTLE_ENDIAN;
         _sub_header._submsg_length = sizeof(_rtps_time_t);
 
-        ret = _z_wbuf_write_bytes(owbf,(uint8_t *)&_sub_header, 0, sizeof(_rtps_submsg_header_t)); 
+        ret = _z_wbuf_write_bytes(&_i_wbf,(uint8_t *)&_sub_header, 0, sizeof(_rtps_submsg_header_t)); 
 
         if (ret == _Z_RES_OK) {
-            ret = _z_wbuf_write_bytes(owbf,(uint8_t *)&msg->_info_ts, 0, sizeof(_rtps_time_t)); 
+            ret = _z_wbuf_write_bytes(&_i_wbf,(uint8_t *)&msg->_info_ts, 0, sizeof(_rtps_time_t)); 
         }
     }
 
     // write DATA submessage for scout message
-#if 0    
-    if (ret ==_Z_RES_OK ){        
-        _rtps_submsg_header_t _sub_header; 
-        _z_wbuf_t _datasub_wbf;
-
-        _sub_header._submsg_id = RTPS_DATA;
-        _sub_header._flags = msg->_dataflags;
-        _sub_header._submsg_length = 0;
-        ret = _rtps_scout_parameterlist_cdr_encode(&_datasub_wbf, &msg->_params, RTPS_LITTLE_ENDIAN);
-
-        if (ret == _Z_RES_OK) {
-            // write submessage header
-            // we do not use inline qos in this implemation.
-            _sub_header._submsg_length = 
-                sizeof(_rtps_data_submsg_head_t) + sizeof(_rtps_cdr_scheme_t) + _z_wbuf_len(&_datasub_wbf);
-            ret = _z_wbuf_write_bytes(owbf,(uint8_t *)&_sub_header, 0, sizeof(_rtps_submsg_header_t)); 
-        }
-
-        if (ret == _Z_RES_OK) {
-            // write data messag header
-            ret = _z_wbuf_write_bytes(owbf,(uint8_t *)&msg->_dataheader, 0, sizeof(_rtps_data_submsg_head_t)); 
-        }
-
-        if (ret == _Z_RES_OK) {
-            // write cdr encoded data as payload
-            
-            // write CDR scheme
-            _z_wbuf_write_bytes(owbf,(uint8_t *)&RTPS_PL_CDR_LE, 0, sizeof(_rtps_cdr_scheme_t)); 
-
-            // write payload
-            ret = _rtps_wbuf_add_wbuf(owbf, &_datasub_wbf);
-        }
-
-        _rtps_scout_paramItem_list_free(&msg->_params);
-        msg->_params = NULL;
-    }
-#else
     if (ret ==_Z_RES_OK ){        
         if (msg->_data_reuse != 1)
         {
@@ -529,58 +488,36 @@ z_result_t _rtps_scouting_message_encode(_z_wbuf_t *buf, _rtps_scouting_message_
             msg->_params = NULL;
             msg->_data_reuse = 1;
         }
+        // write and compact reused datasub 
 
-        // write reused datasub
-        _z_wbuf_t outsub;
-        _z_wbuf_copy(&outsub, &msg->_encoded_datasub);
-        _rtps_wbuf_add_wbuf(owbf, &outsub);
+        // compact wbuf to one packet
+
+        size_t len = _z_wbuf_len(&_i_wbf) + _z_wbuf_len(&(msg->_encoded_datasub));
+        len = len + len % 4;
+        *buf = _z_wbuf_make(len, true);
+        printf("ENCODED SIZE WILL BE ,,, $%d\n", len);
+
+        
+        for (size_t i = _i_wbf._r_idx; i<= _i_wbf._w_idx;i++) {
+            _z_iosli_t *ios = _z_wbuf_get_iosli(&_i_wbf, i);
+            _z_wbuf_write_bytes(buf, ios->_buf, ios->_r_pos, _z_iosli_readable(ios));
+        }
+
+        for (size_t i = msg->_encoded_datasub._r_idx; i<= msg->_encoded_datasub._w_idx;i++) {
+            _z_iosli_t *ios = _z_wbuf_get_iosli(&(msg->_encoded_datasub), i);
+            _z_wbuf_write_bytes(buf, ios->_buf, ios->_r_pos, _z_iosli_readable(ios));
+        }
+
+        printf("WRITTEN size is %d !!!  \n",_z_wbuf_len(buf));
+
+        printf(" packet size is %d !!!\n",_z_iosli_readable(_z_wbuf_get_iosli(buf, 0)));
+        printf(" obf len  is %d...%d... !!!\n",_z_wbuf_len(buf),_z_wbuf_space_left(buf) );
+
+        
     }
-#endif
-#if 0
-    ctrace("############CHECK data#################");
-
-    _z_zbuf_t _o_data = _z_wbuf_to_zbuf(owbf);
-
-    _rtps_scouting_message_t s_msg;
-
-    ret = _rtps_scouting_message_decode(&s_msg, &_o_data);
-    if (ret != _Z_RES_OK) {
-        ctrace("Scouting loop received malformed message");
-    }    
-    _z_wbuf_clear(owbf);
-    _z_zbuf_clear(&_o_data);
-
-    ctrace("HERE "); 
-    _rtps_scouting_message_clear(msg);
-    
-    ctrace("exit"); exit(1);
-#endif    
+  
 
     return ret;
-
-    /*
-    z_result_t ret = _Z_RES_OK;
-
-    uint8_t header = msg->_header;
-
-    _Z_RETURN_IF_ERR(_z_wbuf_write(wbf, header))
-    switch (_Z_MID(msg->_header)) {
-        case _Z_MID_SCOUT: {
-            ret |= _rtps_scout_encode(wbf, msg->_header, &msg->_body._scout);
-        } break;
-
-        case _Z_MID_HELLO: {
-            ret |= _rtps_hello_encode(wbf, msg->_header, &msg->_body._hello);
-        } break;
-
-        default: {
-            _Z_DEBUG("WARNING: Trying to encode session message with unknown ID(%d)", _Z_MID(msg->_header));
-            ret |= _Z_ERR_MESSAGE_TRANSPORT_UNKNOWN;
-        } break;
-    }
-
-    return ret; 
-    */
 }
 
 
@@ -683,17 +620,14 @@ _rtps_submsg_list_t *_rtps_scouting_message_decode(_rtps_scouting_message_t *s_m
 
 void _rtps_scouting_message_clear(_rtps_scouting_message_t *data)
 {
-    if (data->_params != NULL) {
-        ctrace("HERE 1");         
+    if (data->_params != NULL) {        
         _rtps_scout_paramItem_list_free(&data->_params);
         data->_params = NULL;
     }
 
     if (data->_data_reuse == 1)
-    {
-        ctrace("HERE 2");         
-        if(_z_wbuf_len(&data->_encoded_datasub)>0){
-            ctrace("HERE 3");         
+    {        
+        if(_z_wbuf_len(&data->_encoded_datasub)>0){     
             _z_wbuf_clear(&data->_encoded_datasub);
         }
     }

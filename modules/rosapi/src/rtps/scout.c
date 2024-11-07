@@ -61,3 +61,6 @@ z_result_t _rtps_scout_link_init(_z_link_t *zl, _z_string_t *locator)
 void _rtps_scout_link_clear(_z_link_t *zl) {
     _z_link_clear(zl);
 }
+
+
+

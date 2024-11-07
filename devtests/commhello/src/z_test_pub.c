@@ -253,15 +253,17 @@ _z_hello_list_t *rtps_scout_loop(const _z_wbuf_t *wbf, _z_string_t *locator, uns
             if (len ==SIZE_MAX) { // size max is -1: no data
                 continue;
             }
+            printf("RECEIVED len is %d .... \n", len);
             _rtps_scouting_message_t s_msg;
             err = _rtps_scouting_message_decode(&s_msg, &zbf);
             if (err != _Z_RES_OK) {
                 ctrace("Scouting loop received malformed message");
                 continue;
             }
-        }        
+        }               
 
         err = _z_link_send_wbuf(&zl, wbf);
+        printf("ret %d Send len is %d \n..........", ret, _z_wbuf_len(wbf));
     } else {
             printf("link open failed : %d\n", err);
      }
@@ -300,7 +302,7 @@ void rtps_scout_inner() {  // pdp testing {
     // when it writes contents to buffer, wbf allocate memory for a slice of contents.
     // wbf : linked list of written cotents.    
 
-    _rtps_scouting_message_encode(&wbf, &scout);            
+    _rtps_scouting_message_encode(&wbf, &scout); 
 
 #ifdef DEV_DEBUG 
     ctrace("CHECK 2 wbf cap %d len %d ",wbf._ioss._capacity, wbf._ioss._len);
@@ -309,7 +311,7 @@ void rtps_scout_inner() {  // pdp testing {
     ctrace("CHECK 2.3 wbf cap %d len %d ",_z_wbuf_capacity(&wbf), _z_wbuf_len(&wbf));
 #endif    
     ctrace("############CHECK data#################");
-
+#if 0
     _z_zbuf_t _outbuf = _z_wbuf_to_zbuf(&wbf);
     _rtps_scouting_message_t s_msg;
     ret = _rtps_scouting_message_decode(&s_msg, &_outbuf);
@@ -323,17 +325,12 @@ void rtps_scout_inner() {  // pdp testing {
     _rtps_scouting_message_clear(&scout);
     
     ctrace("exit"); exit(1);
-
-    //return ret;
-    
-
-    //_rtps_scouting_message_clear(&scout);
+#endif    
 
     // Scout on multicast
-    ret = rtps_scout_loop(&wbf, &locator, timeout, exit_on_first);
+     ret = rtps_scout_loop(&wbf, &locator, timeout, exit_on_first);       
 
-    _z_wbuf_clear(&wbf);
-
+    
     return;
 }
 
