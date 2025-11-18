@@ -46,7 +46,7 @@ Please make sure to update tests as appropriate.
 - Gunju Park      (parkgj@etri.re.kr)
 - YouJin Kim      (youjin@etri.re.kr)
 - Sungjae JEON    (sjjeon@etri.re.kr)
-
+  
 ## Acknowledgment
 
 This work was supported by Institute of Information & communications Technology Planning & Evaluation (IITP) grant funded by the Korea government(MSIT) (No. RS-2024-00339187, Core Technology Development of On-device Robot Intelligence SW Platform)
